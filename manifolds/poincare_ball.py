@@ -8,6 +8,7 @@ class PoincareBall(Manifold):
         self._dimension = dimension
         self._radius = radius
         self.min_norm = 1e-6
+        self.eps = {torch.float32: 4e-3, torch.float64: 1e-5}
 
     def dimension(self):
         return self._dimension
@@ -21,7 +22,12 @@ class PoincareBall(Manifold):
         return 2.0 / (1.0 - c * x_norm_squared).clamp_min(self.min_norm)
     
     def project(self, point):
-        return super().project(point)
+        c = self._curvature()
+        x_norm = point.norm(dim=-1, p=2, keepdim=True).clamp_min(self.min_norm)
+        maxnorm = (1 - self.eps[point.dtype]) / (c ** 0.5)
+        cond = x_norm > maxnorm
+        projected = point / x_norm * maxnorm
+        return torch.where(cond, projected, point)
 
     def distance(self, point1, point2):
         return super().distance(point1, point2)
@@ -44,7 +50,9 @@ class PoincareBall(Manifold):
         return tanh(c ** 0.5 * v_norm ) * tangent_vector / (c ** 0.5 * v_norm)
     
     def log_map0(self, point):
-        return super().log_map0(point)
+        c = self._curvature()
+        p_norm = point.norm(dim=-1, p=2, keepdim=True).clamp_min(self.min_norm)
+        return 1 / c ** 0.5 * artanh(c ** 0.5 * p_norm) * point / p_norm
     
     def mobius_add(self, x, y):
         c = self._curvature()
@@ -69,7 +77,6 @@ class PoincareBall(Manifold):
         return res
     
     def parallel_transport(self, x, y, vector):
-        
         return super().parallel_transport(x, y, vector)
     
     def parallel_transport0(self, x, vector):
