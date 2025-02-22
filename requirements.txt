@@ -7,3 +7,4 @@ torch-cluster
 torch-spline-conv
 numpy
 notebook
+geoopt
